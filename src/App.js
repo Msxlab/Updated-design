@@ -181,6 +181,24 @@ export default function App() {
                             onMouseLeave={handleMouseUp}
                             onUpdateCountertop={handleUpdateCountertop}
                         />
+                                <div className="flex flex-1">
+    <CountertopCanvas
+        countertops={countertops}
+        selectedIds={selectedIds}
+        zoom={zoom}
+        showGrid={showGrid}
+        isDragging={isDragging}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onUpdateCountertop={handleUpdateCountertop}
+    />
+    <div className="flex flex-col w-1/2">
+        <ThreeDPreview />
+        <SideMenu />
+    </div>
+</div>
                         <SideMenu />
                     </div>
 
