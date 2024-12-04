@@ -119,6 +119,54 @@ export const CountertopCanvas = () => {
         }
         ctx.restore();
     };
+// components/CountertopCanvas.js içinde güncellenecek kısım
+const drawMeasurements = (ctx) => {
+    measurements.forEach(measurement => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = '#2563eb'; // Blue
+        ctx.lineWidth = 2;
+
+        // Ana ölçüm çizgisi
+        ctx.moveTo(measurement.start.x, measurement.start.y);
+        ctx.lineTo(measurement.end.x, measurement.end.y);
+        ctx.stroke();
+
+        // Ölçüm değeri
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#2563eb';
+        const midX = (measurement.start.x + measurement.end.x) / 2;
+        const midY = (measurement.start.y + measurement.end.y) / 2;
+
+        if (measurement.type === 'dimension') {
+            ctx.fillText(
+                `${measurement.value.distance.toFixed(1)}"`,
+                midX + 5,
+                midY - 5
+            );
+        } else if (measurement.type === 'angle') {
+            ctx.fillText(
+                `${measurement.value.angle.toFixed(1)}°`,
+                midX + 5,
+                midY - 5
+            );
+
+            // Açı göstergesi çiz
+            const radius = 20;
+            ctx.beginPath();
+            ctx.arc(
+                measurement.start.x,
+                measurement.start.y,
+                radius,
+                0,
+                measurement.value.angle * Math.PI / 180
+            );
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    });
+};
 
     const drawEdgeThickness = (ctx, countertop) => {
         const thickness = countertop.edgeThickness * zoom;
