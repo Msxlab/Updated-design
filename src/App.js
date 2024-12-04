@@ -202,14 +202,21 @@ export default function App() {
                         <SideMenu />
                     </div>
 
-                    <div className="p-4 bg-green-100 rounded-md m-4">
-                        <h3 className="text-lg font-semibold">
-                            Estimated Price: ${calculatePrice().toFixed(2)}
-                        </h3>
-                        <button
-                            className="p-2 bg-green-500 text-white rounded-md m-4"
-                            onClick={handleSaveQuote}
-                        >
+                    // App.js içinde fiyat gösterilen kısmın güncellenmiş hali
+<div className="p-4 bg-green-100 rounded-md m-4">
+    <h3 className="text-lg font-semibold">
+        Estimated Price: ${calculatePrice().toFixed(2)}
+    </h3>
+    <div className="flex gap-4">
+        <button
+            className="p-2 bg-green-500 text-white rounded-md"
+            onClick={handleSaveQuote}
+        >
+            Save Quote
+        </button>
+        <PDFExport />
+    </div>
+</div>
                             Save Quote
                         </button>
                     </div>
