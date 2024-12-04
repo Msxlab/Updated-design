@@ -1,129 +1,187 @@
-import React from "react";
-import { Grid } from "./Grid";
-import { Rnd } from "react-rnd";
+import React, { useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { updateCountertop, setSelectedIds } from '../store/slices/counterTopSlice';
 
-export const CountertopCanvas = ({
-  countertops,
-  setCountertops, // Props olarak alınıyor
-  selectedIds,
-  zoom,
-  showGrid,
-  isDragging,
-  onMouseDown,
-  onMouseMove,
-  onMouseUp,
-  onMouseLeave,
-  onUpdateCountertop,
-}) => {
-  // Yatay ve dikey bölme işlevleri
-  const handleSplitHorizontal = (id) => {
-    setCountertops((prev) =>
-      prev.flatMap((c) =>
-        c.id === id
-          ? [
-              { ...c, id: Date.now(), height: c.height / 2 },
-              { ...c, id: Date.now() + 1, y: c.y + c.height / 2, height: c.height / 2 },
-            ]
-          : c
-      )
+export const CountertopCanvas = () => {
+    const dispatch = useDispatch();
+    const canvasRef = useRef(null);
+    const {
+        countertops,
+        selectedIds,
+        zoom,
+        showGrid,
+        isDragging
+    } = useSelector(state => state.counterTop);
+
+    // Canvas setup ve grid çizimi
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const scale = window.devicePixelRatio;
+        
+        // Canvas boyutlarını ayarla
+        canvas.width = canvas.offsetWidth * scale;
+        canvas.height = canvas.offsetHeight * scale;
+        ctx.scale(scale, scale);
+        
+        // Canvas'ı temizle
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Grid çizimi
+        if (showGrid) {
+            drawGrid(ctx, canvas.width, canvas.height);
+        }
+        
+        // Tezgahları çiz
+        drawCountertops(ctx);
+        
+    }, [countertops, selectedIds, zoom, showGrid]);
+
+    const drawGrid = (ctx, width, height) => {
+        ctx.beginPath();
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 0.5;
+
+        // Yatay çizgiler
+        for (let i = 0; i < height; i += 20 * zoom) {
+            ctx.moveTo(0, i);
+            ctx.lineTo(width, i);
+        }
+
+        // Dikey çizgiler
+        for (let i = 0; i < width; i += 20 * zoom) {
+            ctx.moveTo(i, 0);
+            ctx.lineTo(i, height);
+        }
+
+        ctx.stroke();
+    };
+
+    const drawCountertops = (ctx) => {
+        countertops.forEach(countertop => {
+            ctx.save();
+            
+            // Tezgah pozisyonuna git
+            ctx.translate(countertop.x, countertop.y);
+            ctx.rotate((countertop.rotation || 0) * Math.PI / 180);
+            
+            // Tezgah çizimi
+            ctx.beginPath();
+            ctx.fillStyle = selectedIds.includes(countertop.id) ? '#b3e0ff' : '#e0e0e0';
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            
+            // Köşeleri yuvarlatılmış dikdörtgen
+            const radius = countertop.borderRadius || 0;
+            ctx.roundRect(
+                -countertop.width * zoom / 2,
+                -countertop.height * zoom / 2,
+                countertop.width * zoom,
+                countertop.height * zoom,
+                radius
+            );
+            
+            ctx.fill();
+            ctx.stroke();
+
+            // Tezgah deseni
+            if (countertop.pattern === 'marble') {
+                drawMarblePattern(ctx, countertop);
+            }
+
+            // Kenar kalınlığı
+            if (countertop.edgeThickness) {
+                drawEdgeThickness(ctx, countertop);
+            }
+
+            ctx.restore();
+        });
+    };
+
+    const drawMarblePattern = (ctx, countertop) => {
+        // Mermer deseni için rastgele damarlar
+        ctx.save();
+        ctx.globalAlpha = 0.1;
+        for (let i = 0; i < 5; i++) {
+            ctx.beginPath();
+            ctx.moveTo(
+                -countertop.width * zoom / 2,
+                (Math.random() - 0.5) * countertop.height * zoom
+            );
+            ctx.bezierCurveTo(
+                0, (Math.random() - 0.5) * countertop.height * zoom,
+                0, (Math.random() - 0.5) * countertop.height * zoom,
+                countertop.width * zoom / 2, (Math.random() - 0.5) * countertop.height * zoom
+            );
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = Math.random() * 2 + 1;
+            ctx.stroke();
+        }
+        ctx.restore();
+    };
+
+    const drawEdgeThickness = (ctx, countertop) => {
+        const thickness = countertop.edgeThickness * zoom;
+        ctx.save();
+        ctx.strokeStyle = '#999';
+        ctx.lineWidth = 1;
+        
+        // Alt kenar kalınlığı
+        ctx.beginPath();
+        ctx.moveTo(-countertop.width * zoom / 2, countertop.height * zoom / 2);
+        ctx.lineTo(-countertop.width * zoom / 2, countertop.height * zoom / 2 + thickness);
+        ctx.lineTo(countertop.width * zoom / 2, countertop.height * zoom / 2 + thickness);
+        ctx.lineTo(countertop.width * zoom / 2, countertop.height * zoom / 2);
+        ctx.stroke();
+        
+        ctx.restore();
+    };
+
+    // Mouse event handlers
+    const handleMouseDown = (e) => {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Tıklanan tezgahı bul
+        const clickedCountertop = findClickedCountertop(x, y);
+        
+        if (clickedCountertop) {
+            if (e.shiftKey) {
+                dispatch(setSelectedIds([...selectedIds, clickedCountertop.id]));
+            } else {
+                dispatch(setSelectedIds([clickedCountertop.id]));
+            }
+        } else {
+            dispatch(setSelectedIds([]));
+        }
+    };
+
+    const findClickedCountertop = (x, y) => {
+        // Tezgahları tersten kontrol et (üsttekinden başla)
+        return [...countertops].reverse().find(countertop => {
+            const dx = x - countertop.x;
+            const dy = y - countertop.y;
+            
+            // Rotasyonu hesaba kat
+            const rotatedX = dx * Math.cos(-countertop.rotation * Math.PI / 180) 
+                         - dy * Math.sin(-countertop.rotation * Math.PI / 180);
+            const rotatedY = dx * Math.sin(-countertop.rotation * Math.PI / 180) 
+                         + dy * Math.cos(-countertop.rotation * Math.PI / 180);
+            
+            return Math.abs(rotatedX) < countertop.width * zoom / 2 
+                && Math.abs(rotatedY) < countertop.height * zoom / 2;
+        });
+    };
+
+    return (
+        <div className="flex-1 relative overflow-hidden bg-white">
+            <canvas
+                ref={canvasRef}
+                className="w-full h-full"
+                onMouseDown={handleMouseDown}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            />
+        </div>
     );
-  };
-
-  const handleSplitVertical = (id) => {
-    setCountertops((prev) =>
-      prev.flatMap((c) =>
-        c.id === id
-          ? [
-              { ...c, id: Date.now(), width: c.width / 2 },
-              { ...c, id: Date.now() + 1, x: c.x + c.width / 2, width: c.width / 2 },
-            ]
-          : c
-      )
-    );
-  };
-
-  return (
-    <div
-      className="flex-1 relative bg-gray-50"
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseLeave}
-    >
-      {/* Grid Sistemi */}
-      <Grid show={showGrid} />
-
-      {/* Bölme Butonları */}
-      <div className="absolute top-2 left-2 space-y-2">
-        <button
-          onClick={() => handleSplitHorizontal(selectedIds[0])}
-          className="p-2 bg-blue-500 text-white rounded"
-        >
-          Split Horizontal
-        </button>
-        <button
-          onClick={() => handleSplitVertical(selectedIds[0])}
-          className="p-2 bg-green-500 text-white rounded"
-        >
-          Split Vertical
-        </button>
-      </div>
-
-      {/* Tezgahlar */}
-      <div
-        style={{
-          transform: `scale(${zoom})`,
-          transformOrigin: "0 0",
-          height: "100%",
-          width: "100%",
-          position: "relative",
-        }}
-      >
-        {countertops.map((ct) => (
-          <Rnd
-            key={ct.id}
-            size={{ width: ct.width * 5, height: ct.height * 5 }}
-            position={{ x: ct.x, y: ct.y }}
-            onDragStop={(e, d) => {
-              onUpdateCountertop(ct.id, "x", d.x);
-              onUpdateCountertop(ct.id, "y", d.y);
-            }}
-            onResizeStop={(e, direction, ref, delta, position) => {
-              onUpdateCountertop(ct.id, "width", parseInt(ref.style.width) / 5);
-              onUpdateCountertop(ct.id, "height", parseInt(ref.style.height) / 5);
-              onUpdateCountertop(ct.id, "x", position.x);
-              onUpdateCountertop(ct.id, "y", position.y);
-            }}
-            className={`border ${
-              selectedIds.includes(ct.id) ? "border-blue-500" : "border-gray-500"
-            }`}
-            style={{
-              boxShadow: selectedIds.includes(ct.id)
-                ? "0 8px 16px rgba(0,0,0,0.2)"
-                : "0 4px 8px rgba(0,0,0,0.1)",
-              backgroundColor: ct.color,
-              borderRadius: `${ct.borderRadius}px`,
-            }}
-          >
-            {/* Tezgah Gövdesi */}
-            <div
-              style={{
-                height: "100%",
-                backgroundColor: ct.color,
-                transform: `rotate(${ct.rotation}deg)`,
-                cursor: isDragging ? "grabbing" : "grab",
-              }}
-            ></div>
-
-            {/* Ölçü Etiketleri */}
-            <div className="absolute -top-5 w-full text-center">
-              {ct.width.toFixed(1)}"
-            </div>
-            <div className="absolute -left-7 top-1/2 -rotate-90 origin-left">
-              {ct.height.toFixed(1)}"
-            </div>
-          </Rnd>
-        ))}
-      </div>
-    </div>
-  );
 };
